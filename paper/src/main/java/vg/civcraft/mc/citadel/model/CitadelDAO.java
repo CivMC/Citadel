@@ -1,10 +1,6 @@
 package vg.civcraft.mc.citadel.model;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
@@ -64,7 +60,10 @@ public class CitadelDAO extends TableStorageEngine<Reinforcement> {
 	private static final String SELECT_REINFORCEMENT = "select type_id, group_id, creation_time, health, insecure " +
 			"from ctdl_reinforcements " +
 			"where chunk_x = ? and chunk_z = ? and world_id = ? and x_offset = ? and y = ? and z_offset = ?;";
-	private static final String SELECT_CHUNK_REINFORCEMENT = "select chunk_x, chunk_z, world_id" +
+	private static final String SELECT_CHUNK_REINFORCEMENT = "select x_offset, y, z_offset, type_id, group_id, creation_time, health, insecure " +
+			"from ctdl_reinforcements " +
+			"where chunk_x = ? and chunk_z = ? and world_id = ?;";
+	private static final String SELECT_ALL_CHUNK_REINFORCEMENT = "select chunk_x, chunk_z, world_id" +
 			" from ctdl_reinforcements " +
 			"group by chunk_x, chunk_z, world_id;";
 
@@ -164,7 +163,7 @@ public class CitadelDAO extends TableStorageEngine<Reinforcement> {
 		final Timer timer = new Timer(logger);
 		try (PreparedStatement deleteStmt = con.prepareStatement(DELETE_REINFORCEMENT)) {
 			for (ReinforcementTuple rein : getDeleteBatch()) {
-				setDeleteDataStatement(deleteStmt, rein.rein, rein.coord);
+				bindDeleteStatementParamteres(deleteStmt, rein.rein, rein.coord);
 				deleteStmt.addBatch();
 			}
 			timer.checkpoint("Deletion Batch Preparation (" + getDeleteBatch().size() + ")");
@@ -327,6 +326,15 @@ public class CitadelDAO extends TableStorageEngine<Reinforcement> {
 				+ "(chunk_x, chunk_z, world_id, x_offset, y ,z_offset))");
 	}
 
+	private void bindSelectStatementParameters(PreparedStatement stmt, int chunkX, int chunkZ, short worldID, int x, int y, int z) throws SQLException {
+		stmt.setInt(1, chunkX);
+		stmt.setInt(2, chunkZ);
+		stmt.setShort(3, worldID);
+		stmt.setByte(4, (byte) BlockBasedChunkMeta.modulo(x));
+		stmt.setShort(5, (short) y);
+		stmt.setByte(6, (byte) BlockBasedChunkMeta.modulo(z));
+	}
+
 	/**
 	 * Gets a single reinforcement at the given location without inserting it into
 	 * the tracking
@@ -342,18 +350,16 @@ public class CitadelDAO extends TableStorageEngine<Reinforcement> {
 		try (Connection con = db.getConnection();) {
 			con.setReadOnly(true);
 			try (PreparedStatement selectRein = con.prepareStatement(SELECT_REINFORCEMENT)) {
-				selectRein.setInt(1, chunkX);
-				selectRein.setInt(2, chunkZ);
-				selectRein.setShort(3, worldID);
-				selectRein.setByte(4, (byte) BlockBasedChunkMeta.modulo(x));
-				selectRein.setShort(5, (short) y);
-				selectRein.setByte(6, (byte) BlockBasedChunkMeta.modulo(z));
+				bindSelectStatementParameters(selectRein, chunkX, chunkZ, worldID, x, y, z);
+
 				try (ResultSet rs = selectRein.executeQuery()) {
 					if (!rs.next()) {
 						return null;
 					}
+
 					short typeID = rs.getShort(1);
 					ReinforcementType type = typeMan.getById(typeID);
+					//TODO trigger delete action??
 					if (type == null) {
 						logger.log(Level.SEVERE, "Failed to load reinforcement with type id " + typeID);
 						return null;
@@ -369,8 +375,9 @@ public class CitadelDAO extends TableStorageEngine<Reinforcement> {
 			}
 		} catch (SQLException e) {
 			logger.log(Level.SEVERE, "Failed to load reinforcement from db: ", e);
-			return null;
 		}
+
+		return null;
 	}
 
 	@Override
@@ -426,7 +433,7 @@ public class CitadelDAO extends TableStorageEngine<Reinforcement> {
 		}
 	}
 
-	private static void setDeleteDataStatement(PreparedStatement deleteRein, Reinforcement data, XZWCoord coord) throws
+	private static void bindDeleteStatementParamteres(PreparedStatement deleteRein, Reinforcement data, XZWCoord coord) throws
 			SQLException {
 		deleteRein.setInt(1, coord.getX());
 		deleteRein.setInt(2, coord.getZ());
@@ -442,12 +449,19 @@ public class CitadelDAO extends TableStorageEngine<Reinforcement> {
 		int preMultipliedZ = chunkData.getChunkCoord().getZ() * 16;
 		ReinforcementTypeManager typeMan = Citadel.getInstance().getReinforcementTypeManager();
 		World world = chunkData.getChunkCoord().getWorld();
+
+		// Add to a list to avoid connection deadlocks.
+		List<Reinforcement> inserts = new ArrayList<>();
+
 		try (Connection con = db.getConnection()) {
-			con.setReadOnly(true);
-			try (PreparedStatement selectRein = con.prepareStatement(SELECT_REINFORCEMENT)) {
-				selectRein.setInt(1, chunkData.getChunkCoord().getX());
-				selectRein.setInt(2, chunkData.getChunkCoord().getZ());
-				selectRein.setShort(3, chunkData.getChunkCoord().getWorldID());
+			try (PreparedStatement selectRein = con.prepareStatement(SELECT_CHUNK_REINFORCEMENT)) {
+				bindSelectStatementParameters(
+						selectRein,
+						chunkData.getChunkCoord().getX(),
+						chunkData.getChunkCoord().getZ(),
+						chunkData.getChunkCoord().getWorldID()
+				);
+
 				try (ResultSet rs = selectRein.executeQuery()) {
 					while (rs.next()) {
 						int xOffset = rs.getByte(1);
@@ -468,13 +482,22 @@ public class CitadelDAO extends TableStorageEngine<Reinforcement> {
 						boolean insecure = rs.getBoolean(8);
 						Reinforcement rein = new Reinforcement(location, type, groupID, creationTime, health, insecure,
 								false);
-						insertFunction.accept(rein);
+						inserts.add(rein);
 					}
 				}
 			}
 		} catch (SQLException e) {
 			logger.log(Level.SEVERE, "Failed to load reinforcement from db: ", e);
 		}
+
+		// Release our connection then trigger updates, so we don't deadlock here.
+		inserts.forEach(insertFunction::accept);
+	}
+
+	private void bindSelectStatementParameters(PreparedStatement stmt, int x, int z, short worldID) throws SQLException {
+		stmt.setInt(1, x);
+		stmt.setInt(2, z);
+		stmt.setShort(3, worldID);
 	}
 
 	@Override
@@ -483,7 +506,7 @@ public class CitadelDAO extends TableStorageEngine<Reinforcement> {
 		try (Connection con = db.getConnection()) {
 			con.setReadOnly(true);
 			try (
-					PreparedStatement selectChunks = con.prepareStatement(SELECT_CHUNK_REINFORCEMENT);
+					PreparedStatement selectChunks = con.prepareStatement(SELECT_ALL_CHUNK_REINFORCEMENT);
 					ResultSet rs = selectChunks.executeQuery()
 			) {
 				while (rs.next()) {
