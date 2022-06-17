@@ -90,7 +90,7 @@ public class Citadel extends ACivMod {
 	public void onDisable() {
 		dao.setBatchMode(true);
 		reinManager.shutDown();
-		dao.cleanupBatches();
+		dao.processBatches();
 		HandlerList.unregisterAll(this);
 		Bukkit.getScheduler().cancelTasks(this);
 	}
