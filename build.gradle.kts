@@ -1,17 +1,11 @@
-import net.civmc.civgradle.CivGradleExtension
-
 plugins {
-	id("net.civmc.civgradle") version "2.+" apply false
+	id("net.civmc.civgradle.plugin") version "1.0.0-SNAPSHOT"
 }
 
 subprojects {
 	apply(plugin = "java-library")
 	apply(plugin = "maven-publish")
-	apply(plugin = "net.civmc.civgradle")
-
-	configure<CivGradleExtension> {
-		pluginName = project.property("pluginName") as String
-	}
+	apply(plugin = "net.civmc.civgradle.plugin")
 
 	repositories {
 		mavenCentral()

@@ -3,6 +3,7 @@ package vg.civcraft.mc.citadel.listener;
 import com.destroystokyo.paper.MaterialTags;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.minecraft.world.level.block.MossBlock;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -44,6 +45,8 @@ import vg.civcraft.mc.civmodcore.inventory.items.MaterialUtils;
 import vg.civcraft.mc.civmodcore.inventory.items.MoreTags;
 import vg.civcraft.mc.civmodcore.utilities.DoubleInteractFixer;
 import vg.civcraft.mc.civmodcore.world.WorldUtils;
+
+import java.util.Iterator;
 
 public class BlockListener implements Listener {
 
@@ -194,10 +197,12 @@ public class BlockListener implements Listener {
 	// prevent breaking reinforced blocks through plant growth
 	@EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
 	public void onStructureGrow(StructureGrowEvent event) {
-		for (BlockState block_state : event.getBlocks()) {
-			if (ReinforcementLogic.getReinforcementProtecting(block_state.getBlock()) != null) {
-				event.setCancelled(true);
-				return;
+		Iterator<BlockState> iterator = event.getBlocks().iterator();
+		while (iterator.hasNext()) {
+			BlockState block = iterator.next();
+			if (ReinforcementLogic.getReinforcementProtecting(block.getBlock()) != null) {
+				iterator.remove();
+				CitadelUtility.dropBlockState(block);
 			}
 		}
 	}
@@ -575,6 +580,7 @@ public class BlockListener implements Listener {
 			}
 			event.getPlayer().sendMessage(Component.text("You can't do that while their are reinforced blocks around!").color(NamedTextColor.RED));
 			event.setCancelled(true);
+			if (!event.isCancelled()) CitadelUtility.dropBlockState(block);
 		}
 	}
 

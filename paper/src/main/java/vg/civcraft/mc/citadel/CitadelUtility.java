@@ -1,20 +1,27 @@
 package vg.civcraft.mc.citadel;
 
-import java.util.logging.Level;
 import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.hover.content.Text;
+import net.minecraft.server.level.ServerLevel;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
 import org.bukkit.command.CommandSender;
+import org.bukkit.craftbukkit.v1_18_R2.block.CraftBlockState;
+import org.bukkit.craftbukkit.v1_18_R2.inventory.CraftItemStack;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import vg.civcraft.mc.citadel.model.Reinforcement;
 import vg.civcraft.mc.citadel.reinforcementtypes.ReinforcementType;
 import vg.civcraft.mc.civmodcore.inventory.items.ItemMap;
 import vg.civcraft.mc.namelayer.NameAPI;
 import vg.civcraft.mc.namelayer.group.Group;
+
+import java.util.List;
+import java.util.logging.Level;
 
 /**
  * Just a useful class with general and misplaced methods that can be called
@@ -132,7 +139,7 @@ public class CitadelUtility {
 	}
 
 	public static boolean attemptReinforcementCreation(Block block, ReinforcementType type, Group group,
-	                                                   Player player) {
+													   Player player) {
 		// check if group still exists
 		if (!group.isValid()) {
 			CitadelUtility.sendAndLog(player, ChatColor.RED,
@@ -165,8 +172,7 @@ public class CitadelUtility {
 			return true;
 		}
 		// check if reinforcement is allowed in the current world
-		if (!type.isAllowedInWorld(block.getWorld().getName()))
-		{
+		if (!type.isAllowedInWorld(block.getWorld().getName())) {
 			CitadelUtility.sendAndLog(player, ChatColor.RED,
 					type.getName() + " can not reinforce in this dimension", block.getLocation());
 			return true;
@@ -185,9 +191,9 @@ public class CitadelUtility {
 		boolean blockIsAlsoReinforcement = block.getType() == type.getItem().getType();
 		if (blockIsAlsoReinforcement) {
 			boolean placingFromReinforcementStack = player.getInventory().getHeldItemSlot() == player.getInventory().first(block.getType());
-				if (placingFromReinforcementStack) {
-					consumeExtra = true;
-					required++;
+			if (placingFromReinforcementStack) {
+				consumeExtra = true;
+				required++;
 			}
 		}
 		if (available < required) {
@@ -212,5 +218,25 @@ public class CitadelUtility {
 		}
 		ReinforcementLogic.createReinforcement(newRein);
 		return false;
+	}
+
+	public static List<ItemStack> getDrops(BlockState blockState) {
+		// Spigot and Paper do not provide a method for getting the drops of a BlockState,
+		// even though there's a method for it. This is why this method exists.
+		var nms = ((CraftBlockState) blockState);
+		// Fun fact! The NMS method that Block#getDrops calls LITERALLY TAKES IN A BLOCKSTATE
+		var drops = net.minecraft.world.level.block.Block.getDrops(
+						nms.getHandle(),
+						(ServerLevel) nms.getWorldHandle(),
+						nms.getPosition(),
+						nms.getWorldHandle().getBlockEntity(nms.getPosition()))
+				.stream().map(CraftItemStack::asBukkitCopy).toList();
+		return drops;
+	}
+
+	public static void dropBlockState(BlockState blockState) {
+		for (ItemStack item : getDrops(blockState)) {
+			blockState.getWorld().dropItemNaturally(blockState.getLocation(), item);
+		}
 	}
 }
