@@ -45,6 +45,8 @@ import vg.civcraft.mc.civmodcore.inventory.items.MoreTags;
 import vg.civcraft.mc.civmodcore.utilities.DoubleInteractFixer;
 import vg.civcraft.mc.civmodcore.world.WorldUtils;
 
+import java.util.Iterator;
+
 public class BlockListener implements Listener {
 
 	private static final Material matfire = Material.FIRE;
@@ -194,12 +196,9 @@ public class BlockListener implements Listener {
 	// prevent breaking reinforced blocks through plant growth
 	@EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
 	public void onStructureGrow(StructureGrowEvent event) {
-		for (BlockState block_state : event.getBlocks()) {
-			if (ReinforcementLogic.getReinforcementProtecting(block_state.getBlock()) != null) {
-				event.setCancelled(true);
-				return;
-			}
-		}
+		event.getBlocks().removeIf(block ->
+				ReinforcementLogic.getReinforcementProtecting(block.getBlock()) != null
+		);
 	}
 
 	// prevent opening reinforced things
