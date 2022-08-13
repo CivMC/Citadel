@@ -1,12 +1,6 @@
 plugins {
-	id("net.civmc.civgradle.plugin")
-	id("io.papermc.paperweight.userdev") version "1.3.1"
-}
-
-civGradle {
-	paper {
-		pluginName = project.property("pluginName") as String
-	}
+	id("net.civmc.civgradle")
+	id("io.papermc.paperweight.userdev")
 }
 
 dependencies {
