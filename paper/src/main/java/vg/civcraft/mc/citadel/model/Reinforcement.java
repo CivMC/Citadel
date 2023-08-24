@@ -145,7 +145,11 @@ public class Reinforcement extends TableBasedDataObject {
 	 *         reinforcements creation
 	 */
 	public boolean isMature() {
-		return System.currentTimeMillis() - creationTime > type.getMaturationTime();
+		double adjustedMaturationTime =
+		    type.scalesWithBlockHardness() ?
+		        Math.sqrt(location.getBlock().getType().getHardness()) * type.getMaturationTime() :
+		        type.getMaturationTime();
+		return System.currentTimeMillis() - creationTime > adjustedMaturationTime;
 	}
 
 	public void setGroup(Group group) {

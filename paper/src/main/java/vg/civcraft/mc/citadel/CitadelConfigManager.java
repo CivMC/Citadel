@@ -211,6 +211,7 @@ public class CitadelConfigManager extends ConfigParser {
 		double decayMultiplier = config.getDouble("decay_multiplier", globalDecayMultiplier);
 		double multiplerOnDeletedGroup = config.getDouble("deleted_group_multipler", 4);
 		int legacyId = config.getInt("legacy_id", -1);
+		boolean scalesWithBlockHardness = config.getBoolean("scales_with_block_hardness", true);
 		List<String> allowedWorlds = ConfigHelper.getStringList(config, "allowed_worlds");
 		if (name == null) {
 			logger.warning("No name specified for reinforcement type at " + config.getCurrentPath());
@@ -232,7 +233,8 @@ public class CitadelConfigManager extends ConfigParser {
 				+ gracePeriod + ", id: " + id + ", allowedWorlds: " + StringUtils.join(allowedWorlds, ", "));
 		return new ReinforcementType(health, returnChance, item, maturationTime, acidTime, acidPriority, maturationScale, gracePeriod,
 				creationEffect, damageEffect, destructionEffect, reinforceables, nonReinforceables, id, name,
-				globalBlackList, decayTimer, decayMultiplier, multiplerOnDeletedGroup, legacyId, allowedWorlds);
+				globalBlackList, decayTimer, decayMultiplier, multiplerOnDeletedGroup, legacyId, allowedWorlds,
+				scalesWithBlockHardness);
 	}
 
 	private void parseReinforcementTypes(ConfigurationSection config) {

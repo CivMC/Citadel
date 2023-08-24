@@ -29,12 +29,14 @@ public class ReinforcementType {
 	private double deletedGroupMulitplier;
 	private int legacyId;
 	private Set<String> allowedWorlds;
+	private boolean typeScalesWithBlockHardness;
 
 	public ReinforcementType(float health, double returnChance, ItemStack item, long maturationTime, long acidTime, int acidPriority,
 			double scale, long gracePeriod, ReinforcementEffect creationEffect, ReinforcementEffect damageEffect,
 			ReinforcementEffect destructionEffect, Collection<Material> allowsReinforceables,
 			Collection<Material> disallowedReinforceables, short id, String name, Collection<Material> globalBlackList,
-			long decayTimer, double decayMultiplier, double deletedGroupMulitplier, int legacyId, Collection allowedWorlds) {
+			long decayTimer, double decayMultiplier, double deletedGroupMulitplier, int legacyId, Collection allowedWorlds,
+			boolean scalesWithBlockHardness) {
 		this.health = health;
 		this.name = name;
 		this.returnChance = returnChance;
@@ -48,6 +50,7 @@ public class ReinforcementType {
 		this.destructionEffect = destructionEffect;
 		this.gracePeriod = gracePeriod;
 		this.deletedGroupMulitplier = deletedGroupMulitplier;
+		this.typeScalesWithBlockHardness = scalesWithBlockHardness;
 		if (!allowsReinforceables.isEmpty()) {
 			this.allowedReinforceables = new TreeSet<>(allowsReinforceables);
 		} else {
@@ -102,6 +105,13 @@ public class ReinforcementType {
 	 */
 	public long getAcidTime() {
 		return acidTime;
+	}
+
+	/**
+	 * @return whether maturation time for this type scales with block hardness
+	 */
+	public boolean scalesWithBlockHardness() {
+		return typeScalesWithBlockHardness;
 	}
 
 	/**
