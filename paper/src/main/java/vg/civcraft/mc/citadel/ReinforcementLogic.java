@@ -78,6 +78,10 @@ public final class ReinforcementLogic {
 		float damageAmount = 1.0F;
 		if (!reinforcement.isMature()) {
 			double timeExisted = System.currentTimeMillis() - reinforcement.getCreationTime();
+			double adjustedMaturationTime =
+			    reinforcement.getType().scalesWithBlockHardness() ?
+			        Math.sqrt(reinforcement.getLocation().getBlock().getType().getHardness()) * reinforcement.getType().getMaturationTime() :
+			        reinforcement.getType().getMaturationTime();
 			double progress = timeExisted / reinforcement.getType().getMaturationTime();
 			damageAmount /= progress;
 			damageAmount *= reinforcement.getType().getMaturationScale();
